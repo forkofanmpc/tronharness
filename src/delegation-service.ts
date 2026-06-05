@@ -60,24 +60,26 @@ async function delegateEnergyToAddress(
   }
 
   const existing = findDelegationForReceiver(state, receiverAddress);
-  const onChain = await getDelegatedResource(sponsorAddress, receiverAddress, network);
 
-  if (
-    hasRecentDelegation(state, receiverAddress) ||
-    onChain.energySun > 0
-  ) {
+  // Idempotency guard: if we recently delegated to this receiver, skip re-sending
+  // (energy may not have refreshed yet, or we may already have an in-flight update).
+  if (hasRecentDelegation(state, receiverAddress)) {
     return {
       receiverAddress,
       action: "skip",
-      amountSun: onChain.energySun || existing?.amountSun || 0,
-      reason: "Delegation already exists on-chain or was recently recorded",
+      amountSun: existing?.amountSun || 0,
+      reason: "Recently delegated to this receiver; skipping re-delegation",
       txId: existing?.txId ?? null,
       dryRun: options.dryRun,
     };
   }
 
   const energyDeficit = config.ENERGY_THRESHOLD - snapshot.energyAvailable;
-  const amountSun = await estimateDelegateSunForEnergy(energyDeficit, network);
+  const amountSun = await estimateDelegateSunForEnergy(
+    energyDeficit,
+    network,
+    sponsorAddress,
+  );
 
   const maxDelegate = await getCanDelegateMax(sponsorAddress, "ENERGY", network);
   if (amountSun > maxDelegate) {
@@ -119,10 +121,22 @@ async function delegateEnergyToAddress(
   const signed = await tronWeb.trx.sign(unsigned);
   const result = await tronWeb.trx.sendRawTransaction(signed);
 
+  const resultAny = result as unknown as {
+    result?: unknown;
+    txid?: unknown;
+    message?: unknown;
+  };
+  const ok =
+    resultAny.result === true || resultAny.result === "true" || resultAny.result === 1;
+  if (!ok) {
+    const message = resultAny.message ? String(resultAny.message) : "";
+    throw new Error(
+      `sendRawTransaction failed for receiver=${receiverAddress}: ${message || String(result)}`,
+    );
+  }
+
   const txId =
-    typeof result === "object" && result !== null && "txid" in result
-      ? String((result as { txid: string }).txid)
-      : null;
+    typeof resultAny.txid === "string" ? resultAny.txid : null;
 
   const newState = appendDelegationRecord(state, {
     receiverAddress,
@@ -188,10 +202,22 @@ async function undelegateFromAddress(
   );
   const signed = await tronWeb.trx.sign(unsigned);
   const result = await tronWeb.trx.sendRawTransaction(signed);
+  const resultAny = result as unknown as {
+    result?: unknown;
+    txid?: unknown;
+    message?: unknown;
+  };
+  const ok =
+    resultAny.result === true || resultAny.result === "true" || resultAny.result === 1;
+  if (!ok) {
+    const message = resultAny.message ? String(resultAny.message) : "";
+    throw new Error(
+      `sendRawTransaction undelegation failed for receiver=${receiverAddress}: ${message || String(result)}`,
+    );
+  }
+
   const txId =
-    typeof result === "object" && result !== null && "txid" in result
-      ? String((result as { txid: string }).txid)
-      : null;
+    typeof resultAny.txid === "string" ? resultAny.txid : null;
 
   return {
     receiverAddress,

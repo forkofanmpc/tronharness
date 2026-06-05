@@ -1,5 +1,5 @@
 import { getLogger } from "./lib/logger.js";
-import { writeJsonReport } from "./lib/report.js";
+import { loadLatestModuleReport, writeJsonReport } from "./lib/report.js";
 import { TronGridClient } from "./lib/trongrid.js";
 import {
   createTronWeb,
@@ -10,6 +10,7 @@ import { classifyVerdict } from "./lib/verdict.js";
 import type {
   RawTxInspection,
   SuiteRunContext,
+  AddressIntelligenceReport,
   TransactionReceiptForensics,
   TxForensicsReport,
 } from "./lib/types.js";
@@ -55,7 +56,7 @@ async function pollTransactionInfo(
 ): Promise<TxInfoResponse> {
   for (let i = 0; i < maxAttempts; i++) {
     const info = await client.post<TxInfoResponse>(
-      "/wallet/gettransactioninfobyid",
+      "/walletsolidity/gettransactioninfobyid",
       { value: txId },
     );
     if (info.id) {
@@ -150,6 +151,13 @@ export async function runTxForensics(
 
   log.info({ txId }, "Fetching transaction forensics");
 
+  const addressReport = await loadLatestModuleReport<AddressIntelligenceReport>(
+    ctx.outputDir,
+    "address-intelligence",
+  );
+  const rotationPattern = addressReport?.summary.rotationPattern;
+  const jitFeasibility = addressReport?.summary.jitFeasibility;
+
   const [info, tx] = await Promise.all([
     pollTransactionInfo(client, txId),
     client.post<TxResponse>("/wallet/gettransactionbyid", { value: txId }),
@@ -172,6 +180,8 @@ export async function runTxForensics(
     receipt,
     knownDelegation,
     senderActivated,
+    rotationPattern,
+    jitFeasibility,
   });
 
   const report: TxForensicsReport = {

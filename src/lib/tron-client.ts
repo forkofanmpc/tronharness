@@ -124,13 +124,16 @@ export async function getDelegatedResource(
 export async function estimateDelegateSunForEnergy(
   targetEnergy: number,
   network: TronNetwork,
+  referenceAddress: string,
 ): Promise<number> {
   const client = new TronGridClient({ network });
   const totals = await client.post<{
     TotalEnergyLimit?: number;
     TotalEnergyWeight?: number;
   }>("/wallet/getaccountresource", {
-    address: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
+    // Any activated external account should return the same network-wide
+    // TotalEnergyLimit/TotalEnergyWeight. Use our sponsor as a stable source.
+    address: referenceAddress,
     visible: true,
   });
 

@@ -75,6 +75,7 @@ function signHexRequest(
     "X-Enterprise-Id": enterpriseId,
     "X-Timestamp": timestamp,
     "X-Signature": signature,
+    Accept: "application/json",
     "Content-Type": "application/json",
   };
 }
@@ -157,20 +158,22 @@ export async function runHexApiAudit(
     return { report, filepath };
   }
 
-  const body = "";
-  const headers = signHexRequest(
-    "GET",
-    "/v1/accounts",
-    body,
-    config.HEX_TRUST_API_KEY!,
-    config.HEX_ENTERPRISE_ID!,
-    config.HEX_PRIVATE_KEY!,
-  );
-
   const probes: HexApiProbeResult[] = [];
   for (const probe of PROBE_CATALOG) {
     log.info({ probe: probe.name }, "Probing Hex API endpoint");
-    probes.push(await runProbe(config.HEX_API_BASE_URL, probe, headers));
+    const bodyString = probe.body ? JSON.stringify(probe.body) : "";
+    const signedHeaders = signHexRequest(
+      probe.method,
+      probe.path,
+      bodyString,
+      config.HEX_TRUST_API_KEY!,
+      config.HEX_ENTERPRISE_ID!,
+      config.HEX_PRIVATE_KEY!,
+    );
+
+    probes.push(
+      await runProbe(config.HEX_API_BASE_URL, probe, signedHeaders),
+    );
   }
 
   const allFeeFields = probes.flatMap((p) => p.feeRelatedFields);

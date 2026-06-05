@@ -41,8 +41,6 @@ export type AppConfig = z.infer<typeof envSchema> & {
   hasHexCredentials: boolean;
 };
 
-let cachedConfig: AppConfig | null = null;
-
 export function loadConfig(overrides?: { network?: TronNetwork }): AppConfig {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
@@ -59,21 +57,16 @@ export function loadConfig(overrides?: { network?: TronNetwork }): AppConfig {
       parsed.data.HEX_PRIVATE_KEY,
   );
 
-  cachedConfig = {
+  return {
     ...parsed.data,
     NETWORK: overrides?.network ?? parsed.data.NETWORK,
     targetAddresses,
     hasHexCredentials,
   };
-
-  return cachedConfig;
 }
 
 export function getConfig(): AppConfig {
-  if (!cachedConfig) {
-    return loadConfig();
-  }
-  return cachedConfig;
+  return loadConfig();
 }
 
 export function parseAddresses(input?: string): string[] {

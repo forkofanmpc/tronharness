@@ -116,12 +116,18 @@ program
   .description("Compare Hex quoted fee vs on-chain burn")
   .option("--tx <hash>", "Transaction ID (runs forensics if needed)")
   .option("--hex-quote <trx>", "Hex quoted fee in TRX")
+  .option(
+    "--known-delegation",
+    "Energy was delegated before this tx",
+    false,
+  )
   .action(async (cmdOpts) => {
     const opts = program.opts();
     const ctx = buildContext(opts);
     await runFeeAudit(ctx, {
       txId: cmdOpts.tx,
       hexQuoteTrx: cmdOpts.hexQuote ? Number(cmdOpts.hexQuote) : undefined,
+      knownDelegation: Boolean(cmdOpts.knownDelegation),
     });
   });
 

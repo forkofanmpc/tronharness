@@ -9,6 +9,7 @@ import type { FeeAuditReport, SuiteRunContext, TxForensicsReport } from "./lib/t
 export interface FeeAuditOptions {
   txId?: string;
   hexQuoteTrx?: number;
+  knownDelegation?: boolean;
 }
 
 export async function runFeeAudit(
@@ -21,7 +22,9 @@ export async function runFeeAudit(
   let forensics: TxForensicsReport | null = null;
 
   if (options.txId) {
-    const result = await runTxForensics(ctx, options.txId);
+    const result = await runTxForensics(ctx, options.txId, {
+      knownDelegation: options.knownDelegation ?? false,
+    });
     forensics = result.report;
   } else {
     forensics = await loadLatestModuleReport<TxForensicsReport>(

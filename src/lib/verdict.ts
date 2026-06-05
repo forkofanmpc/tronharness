@@ -108,9 +108,9 @@ export function classifyVerdict(input: VerdictInput): {
     isInRange(receipt.totalFeeTrx, FULL_BURN_TRX_MIN, FULL_BURN_TRX_MAX)
   ) {
     return {
-      verdict: "REAL_LIMITATION",
+      verdict: "INCONCLUSIVE",
       reason:
-        "Zero Energy usage with full TRX burn. Transaction did not consume delegated Energy.",
+        "Zero Energy usage with full TRX burn. This is consistent with having NO usable delegated Energy at execution time. Re-run with known delegation evidence to confirm REAL_LIMITATION.",
     };
   }
 

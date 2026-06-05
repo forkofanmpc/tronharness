@@ -4,6 +4,7 @@ import { getLogger } from "./lib/logger.js";
 import { writeJsonReport } from "./lib/report.js";
 import { TronGridClient } from "./lib/trongrid.js";
 import { getAccountResourceSnapshot } from "./lib/tron-client.js";
+import { createTronWeb } from "./lib/tron-client.js";
 import type {
   AddressAnalysis,
   AddressIntelligenceReport,
@@ -138,6 +139,9 @@ async function analyzeAddress(
   const log = getLogger();
   log.info({ address }, "Analyzing address");
 
+  // Used to normalize TRON addresses between hex and Base58 for direction classification.
+  const tronWeb = createTronWeb({ network: "mainnet" });
+
   const [trc20Txs, trxTxs, resources] = await Promise.all([
     fetchTrc20History(client, address, minTimestamp),
     fetchTrxHistory(client, address, minTimestamp),
@@ -153,7 +157,27 @@ async function analyzeAddress(
 
   const outboundTrx = trxTxs.filter((tx) => {
     const owner = tx.raw_data?.contract?.[0]?.parameter?.value?.owner_address;
-    return owner && client.host; // owner is hex in API; compare via trc20 is primary
+    const fromField = (tx as unknown as { from?: string }).from;
+
+    const matches = (candidate: unknown): boolean => {
+      if (typeof candidate !== "string") return false;
+      if (candidate.toLowerCase() === address.toLowerCase()) return true;
+
+      // If candidate is hex (starts with 41), try converting to Base58Check.
+      if (candidate.startsWith("41") && candidate.length >= 42) {
+        try {
+          const base58 = tronWeb.address.fromHex(candidate);
+          return base58.toLowerCase() === address.toLowerCase();
+        } catch {
+          return false;
+        }
+      }
+
+      // Otherwise it may already be Base58 (or some other format).
+      return false;
+    };
+
+    return matches(owner) || matches(fromField);
   });
 
   let rotationRole: AddressAnalysis["rotationRole"] = "inactive";
