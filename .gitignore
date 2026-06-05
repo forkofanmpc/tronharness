@@ -1,0 +1,8 @@
+.cursor/
+node_modules/
+dist/
+.env
+reports/
+delegation-state.json
+*.log
+.DS_Store
